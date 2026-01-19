@@ -1,1 +1,19 @@
 /.idea
+
+# Go 编译生成的二进制文件
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+
+# Go 构建缓存和模块文件
+/go.sum
+/go.mod
+/go.work
+
+# 临时文件和目录
+*.log
+*.tmp
+*.out
+*.prof
