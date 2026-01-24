@@ -10,7 +10,7 @@ type User struct {
 	UUID               uuid.UUID    `gorm:"type:char(36);primarykey"`
 	Email              string       `gorm:"column:email"`
 	Nickname           *string      `gorm:"column:nickname"`
-	Signature          *string      `gorm:"column:signature"`
+	Signature          string       `gorm:"column:signature"`
 	Role               string       `gorm:"type:enum('interviewee', 'interviewer');default:'interviewee'"`
 	Status             *string      `gorm:"column:status"`
 	PassedDirections   *string      `gorm:"type:json"`
@@ -18,6 +18,7 @@ type User struct {
 	Application        *Application `gorm:"foreignKey:UserID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
+	PassWord           string
 }
 
 type Application struct {
@@ -33,4 +34,30 @@ type Application struct {
 	UserID     uuid.UUID `gorm:"type:char(36);uniqueIndex"`
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
+}
+
+type Announcement struct {
+	UUID      uuid.UUID `gorm:"type:char(36);primarykey"`
+	Title     string
+	Content   string
+	Pinned    bool
+	authorId  uuid.UUID
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+type Task struct {
+	UUID         uuid.UUID `gorm:"type:char(36);primarykey"`
+	Title        string
+	Description  string
+	TargetUserId uuid.UUID
+	AssignedBy   uuid.UUID
+	Report       string // target提交的报告（markdown）
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
+type code struct {
+	Email string
+	Code  string
 }
