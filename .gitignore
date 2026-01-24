@@ -1,5 +1,3 @@
-/.idea
-
 # Go 编译生成的二进制文件
 *.exe
 *.dll
@@ -7,13 +5,17 @@
 *.dylib
 *.test
 
-# Go 构建缓存和模块文件
-/go.sum
-/go.mod
-/go.work
-
 # 临时文件和目录
 *.log
 *.tmp
 *.out
 *.prof
+
+# IDE 和编辑器生成的文件
+.idea/
+.vscode/
+*.sublime*
+
+.env
+go.sum
+go.mod
