@@ -2,6 +2,7 @@ package auth
 
 import (
 	"errors"
+	"regexp"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -31,4 +32,25 @@ func ValidatePassword(password string) error {
 	// 比如必须包含大小写字母、数字、特殊字符等
 
 	return nil
+}
+
+func ValidateEmail(email string) bool {
+	// RFC 5322 标准的正则（相对严格）
+	pattern := `^[a-zA-Z0-9.!#$%&'*+/=?^_{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$`
+	re := regexp.MustCompile(pattern)
+	return re.MatchString(email)
+}
+
+func ValidateNickname(nickname string) bool {
+	if len(nickname) < 3 || len(nickname) > 20 {
+		return false
+	}
+
+	for i := 0; i < len(nickname); i++ {
+		if nickname[i] > 127 {
+			return false
+		}
+	}
+
+	return true
 }

@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 	"xdsec-join-2026/auth"
 	"xdsec-join-2026/handlers"
@@ -17,13 +18,6 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
-
-func isInterviewer(c *gin.Context) bool {
-	result := false
-	return result
-}
-
-func genToken()
 
 func main() {
 
@@ -54,7 +48,7 @@ func main() {
 		type register struct {
 			Password  string `json:"password" binding:"required"`
 			Email     string `json:"email" binding:"required,email"`
-			Nickname  string `json:"nickname" binding:"required"`
+			Nickname  string `json:"nickname" binding:"required"` // 只允许填写ascii范围内的字符
 			Signature string `json:"signature" binding:"required"`
 		}
 
@@ -65,6 +59,27 @@ func main() {
 			c.JSON(400, gin.H{
 				"ok":      false,
 				"message": "请求数据无效",
+			})
+			return
+		}
+		if !auth.ValidateEmail(userData.Email) || len(userData.Email) > 30 {
+			c.JSON(400, gin.H{
+				"ok":      false,
+				"message": "传入的邮箱过长或非法",
+			})
+			return
+		}
+		if len(userData.Signature) > 30 {
+			c.JSON(400, gin.H{
+				"ok":      false,
+				"message": "传入的签名过长",
+			})
+			return
+		}
+		if !auth.ValidateNickname(userData.Nickname) || strings.TrimSpace(userData.Nickname) != userData.Nickname {
+			c.JSON(400, gin.H{
+				"ok":      false,
+				"message": "传入的昵称非法",
 			})
 			return
 		}
@@ -144,6 +159,7 @@ func main() {
 
 	// 用户登录
 	authRoute.POST("/login", func(c *gin.Context) {
+		// password传入明文，传输过程中的安全性由 https 保证
 		type LoginRequest struct {
 			Email    string `json:"email" binding:"required,email"`
 			Password string `json:"password" binding:"required"`
@@ -154,6 +170,13 @@ func main() {
 			c.JSON(400, gin.H{
 				"ok":      false,
 				"message": "请求数据无效",
+			})
+			return
+		}
+		if !auth.ValidateEmail(req.Email) {
+			c.JSON(400, gin.H{
+				"ok":      false,
+				"message": "传入的邮箱非法",
 			})
 			return
 		}
@@ -192,7 +215,6 @@ func main() {
 					"nickname": user.Nickname,
 					"role":     user.Role,
 				},
-				"expires_in": 7 * 24 * 60 * 60, // 7天，单位秒
 			}})
 	})
 
@@ -210,11 +232,7 @@ func main() {
 			return
 		}
 
-		userUUIDStr, exists := c.Get("user_uuid")
-		if !exists {
-			c.JSON(401, gin.H{"ok": false, "message": "未登录"})
-			return
-		}
+		userUUIDStr, _ := c.Get("user_uuid")
 		userUUID, _ := uuid.Parse(userUUIDStr.(string))
 
 		// 获取当前用户
@@ -249,23 +267,74 @@ func main() {
 			"ok":      true,
 			"message": "更新密码成功",
 		})
-	},
-	)
+	})
+
+	authRoute.GET("/me", handlers.AuthMiddleware(), func(c *gin.Context) {
+		userUUID, _ := c.Get("user_uuid")
+		userRole, _ := c.Get("user_role")
+		userEmail, _ := c.Get("user_email")
+		c.JSON(200, gin.H{
+			"ok": true,
+			"data": gin.H{
+				"user": gin.H{
+					"id":    userUUID,
+					"role":  userRole,
+					"email": userEmail,
+				},
+			},
+		})
+	})
 
 	users := base.Group("/users")
 
-	users.GET("/", func(c *gin.Context) {
-		var users []models.User
-		result := db.Preload("Application").Find(&users)
+	users.GET("/", handlers.AuthMiddleware(), func(c *gin.Context) {
+		db := c.MustGet("db").(*gorm.DB)
 
-		if result.Error != nil {
+		// 获取用户角色
+		userRoleInterface, _ := c.Get("user_role")
+		userRole, _ := userRoleInterface.(string)
+
+		// 查询参数
+		selectedRole := c.Query("role")
+		selectedKeyword := strings.TrimSpace(c.Query("q"))
+
+		// 构建查询 - 显式选择要返回的字段，排除密码
+		query := db.Model(&models.User{}).
+			Select("uuid", "email", "nickname", "signature", "role",
+				"status", "passed_directions", "passed_directions_by",
+				"created_at", "updated_at")
+
+		// 添加过滤条件
+		if selectedRole != "" && (selectedRole == "interviewee" || selectedRole == "interviewer") {
+			query = query.Where("role = ?", selectedRole)
+		}
+
+		if selectedKeyword != "" {
+			searchPattern := "%" + selectedKeyword + "%"
+			query = query.Where("email LIKE ? OR nickname LIKE ?", searchPattern, searchPattern)
+		}
+
+		// 根据角色决定是否预加载 Application
+		if userRole == "interviewer" {
+			query = query.Preload("Application")
+		}
+
+		// 执行查询
+		var users []models.User
+		if err := query.Find(&users).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "查询用户失败",
+				"ok":      false,
+				"message": "查询失败",
+				"error":   err.Error(),
 			})
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{"ok": true, "data": users})
+		// 返回结果
+		c.JSON(http.StatusOK, gin.H{
+			"ok":   true,
+			"data": gin.H{"users": users},
+		})
 	})
 
 	r.Run(":8080")
