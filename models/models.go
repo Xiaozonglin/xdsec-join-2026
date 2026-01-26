@@ -13,9 +13,9 @@ type User struct {
 	Signature          string       `gorm:"column:signature" json:"signature"`
 	Role               string       `gorm:"type:enum('interviewee', 'interviewer');default:'interviewee'" json:"role"`
 	Status             string       `gorm:"type:enum('r1_pending', 'r1_passed', 'r2_pending', 'r2_passed', 'rejected', 'offer');default:'r1_pending'" json:"status"`
-	Directions         string       `gorm:"type:json" json:"directions"`
-	PassedDirections   string       `gorm:"type:json" json:"passedDirections"`
-	PassedDirectionsBy string       `gorm:"type:json" json:"passedDirectionsBy"`
+	Directions         string       `gorm:"type:json;default:'[]'" json:"directions"`
+	PassedDirections   string       `gorm:"type:json;default:'[]'" json:"passedDirections"`
+	PassedDirectionsBy string       `gorm:"type:json;default:'[]'" json:"passedDirectionsBy"`
 	Application        *Application `gorm:"foreignKey:UserID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;" json:"application,omitempty"`
 	CreatedAt          time.Time    `json:"createdAt"`
 	UpdatedAt          time.Time    `json:"updatedAt"`
@@ -30,7 +30,7 @@ type Application struct {
 	Department string    `gorm:"column:department;not null" json:"department"`
 	Major      string    `gorm:"column:major;not null" json:"major"`
 	StudentId  string    `gorm:"column:student_id;not null" json:"studentId"`
-	Directions string    `gorm:"type:json" json:"directions"`
+	Directions string    `gorm:"type:json;default:'[]'" json:"directions"`
 	Resume     string    `gorm:"column:resume;type:text;not null" json:"resume"`
 	UserID     uuid.UUID `gorm:"type:char(36);uniqueIndex" json:"-"`
 	CreatedAt  time.Time `json:"createdAt"`
