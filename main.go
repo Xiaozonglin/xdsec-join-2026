@@ -66,11 +66,11 @@ func main() {
 	usersRoute := api.Group("/users")
 	{
 		usersRoute.GET("", handlers.AuthMiddleware(), handlers.GetUsers(db))
-		usersRoute.GET("/:id", handlers.RequireInterviewer(), handlers.GetUserDetail(db))
+		usersRoute.GET("/:id", handlers.AuthMiddleware(), handlers.RequireInterviewer(), handlers.GetUserDetail(db))
 		usersRoute.PATCH("/me", handlers.AuthMiddleware(), handlers.UpdateProfile(db))
-		usersRoute.POST("/:id/role", handlers.RequireInterviewer(), handlers.SetUserRole(db))
-		usersRoute.POST("/:id/passed-directions", handlers.RequireInterviewer(), handlers.SetPassedDirections(db))
-		usersRoute.DELETE("/:id", handlers.RequireInterviewer(), handlers.DeleteUser(db))
+		usersRoute.POST("/:id/role", handlers.AuthMiddleware(), handlers.RequireInterviewer(), handlers.SetUserRole(db))
+		usersRoute.POST("/:id/passed-directions", handlers.AuthMiddleware(), handlers.RequireInterviewer(), handlers.SetPassedDirections(db))
+		usersRoute.DELETE("/:id", handlers.AuthMiddleware(), handlers.RequireInterviewer(), handlers.DeleteUser(db))
 		usersRoute.DELETE("/me", handlers.AuthMiddleware(), handlers.DeleteSelf(db))
 	}
 
@@ -78,10 +78,10 @@ func main() {
 	announcementsRoute := api.Group("/announcements")
 	{
 		announcementsRoute.GET("", handlers.GetAnnouncements(db))
-		announcementsRoute.POST("", handlers.RequireInterviewer(), handlers.CreateAnnouncement(db))
-		announcementsRoute.PATCH("/:id", handlers.RequireInterviewer(), handlers.UpdateAnnouncement(db))
-		announcementsRoute.POST("/:id/pin", handlers.RequireInterviewer(), handlers.PinAnnouncement(db))
-		announcementsRoute.DELETE("/:id", handlers.RequireInterviewer(), handlers.DeleteAnnouncement(db))
+		announcementsRoute.POST("", handlers.AuthMiddleware(), handlers.RequireInterviewer(), handlers.CreateAnnouncement(db))
+		announcementsRoute.PATCH("/:id", handlers.AuthMiddleware(), handlers.RequireInterviewer(), handlers.UpdateAnnouncement(db))
+		announcementsRoute.POST("/:id/pin", handlers.AuthMiddleware(), handlers.RequireInterviewer(), handlers.PinAnnouncement(db))
+		announcementsRoute.DELETE("/:id", handlers.AuthMiddleware(), handlers.RequireInterviewer(), handlers.DeleteAnnouncement(db))
 	}
 
 	// 面试申请
@@ -89,9 +89,9 @@ func main() {
 	{
 		applicationsRoute.POST("", handlers.AuthMiddleware(), handlers.CreateApplication(db))
 		applicationsRoute.GET("/me", handlers.AuthMiddleware(), handlers.GetMyApplication(db))
-		applicationsRoute.GET("/:userId", handlers.RequireInterviewer(), handlers.GetApplicationDetail(db))
-		applicationsRoute.POST("/:userId/status", handlers.RequireInterviewer(), handlers.SetInterviewStatus(db))
-		applicationsRoute.DELETE("/:userId", handlers.RequireInterviewer(), handlers.DeleteApplication(db))
+		applicationsRoute.GET("/:userId", handlers.AuthMiddleware(), handlers.RequireInterviewer(), handlers.GetApplicationDetail(db))
+		applicationsRoute.POST("/:userId/status", handlers.AuthMiddleware(), handlers.RequireInterviewer(), handlers.SetInterviewStatus(db))
+		applicationsRoute.DELETE("/:userId", handlers.AuthMiddleware(), handlers.RequireInterviewer(), handlers.DeleteApplication(db))
 		applicationsRoute.DELETE("/me", handlers.AuthMiddleware(), handlers.DeleteSelfApplication(db))
 	}
 
@@ -99,16 +99,16 @@ func main() {
 	tasksRoute := api.Group("/tasks")
 	{
 		tasksRoute.GET("", handlers.AuthMiddleware(), handlers.GetTasks(db))
-		tasksRoute.POST("", handlers.RequireInterviewer(), handlers.CreateTask(db))
-		tasksRoute.PATCH("/:id", handlers.RequireInterviewer(), handlers.UpdateTask(db))
+		tasksRoute.POST("", handlers.AuthMiddleware(), handlers.RequireInterviewer(), handlers.CreateTask(db))
+		tasksRoute.PATCH("/:id", handlers.AuthMiddleware(), handlers.RequireInterviewer(), handlers.UpdateTask(db))
 		tasksRoute.POST("/:id/report", handlers.AuthMiddleware(), handlers.SubmitTaskReport(db))
-		tasksRoute.DELETE("/:id", handlers.RequireInterviewer(), handlers.DeleteTask(db))
+		tasksRoute.DELETE("/:id", handlers.AuthMiddleware(), handlers.RequireInterviewer(), handlers.DeleteTask(db))
 	}
 
 	// 数据导出
 	exportRoute := api.Group("/export")
 	{
-		exportRoute.GET("/applications", handlers.RequireInterviewer(), handlers.ExportApplications(db))
+		exportRoute.GET("/applications", handlers.AuthMiddleware(), handlers.RequireInterviewer(), handlers.ExportApplications(db))
 	}
 
 	r.Run(":8080")
