@@ -1,11 +1,16 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var (
@@ -67,4 +72,45 @@ func ParseToken(tokenString string) (*Claims, error) {
 	}
 
 	return nil, ErrInvalidToken
+}
+
+// GenerateCSRFToken 生成CSRF Token
+func GenerateCSRFToken() string {
+	b := make([]byte, 32)
+	rand.Read(b)
+	return hex.EncodeToString(b)
+}
+
+// GenerateEmailCode 生成6位邮箱验证码
+func GenerateEmailCode() (string, error) {
+	b := make([]byte, 3)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", err
+	}
+	code := fmt.Sprintf("%06x", b)
+	return code[:6], nil
+}
+
+// HashPassword 使用bcrypt加密密码
+func HashPassword(password string) (string, error) {
+	// bcrypt.DefaultCost = 10，这个值可以在4-31之间，越大越安全但越慢
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(bytes), nil
+}
+
+// CheckPassword 验证密码
+func CheckPassword(password, hash string) error {
+	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+}
+
+// ParseUUIDString 安全地解析UUID字符串
+func ParseUUIDString(s string) (uuid.UUID, error) {
+	if s == "" {
+		return uuid.Nil, errors.New("empty uuid string")
+	}
+	return uuid.Parse(s)
 }

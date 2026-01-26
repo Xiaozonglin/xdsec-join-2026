@@ -6,37 +6,45 @@ import (
 	"os"
 )
 
-func main() {
-	// 配置SMTP服务器信息
+// SendEmailCode 发送邮箱验证码
+func SendEmailCode(to, code, purpose string) error {
 	smtpHost := os.Getenv("smtpHost")
 	smtpPort := os.Getenv("smtpPort")
 	smtpUser := os.Getenv("smtpUser")
 	smtpPassword := os.Getenv("smtpPassword")
 
-	// 发件人和收件人
-	from := "noreply@xdsec.club"
-	to := []string{""}
+	from := os.Getenv("smtpUser")
 
-	// 邮件内容
-	subject := "西电信安协会招新系统测试邮件\r\n"
-	body := "这是一封测试邮件，由林林通过 Golang 调用 smtp 发出。\r\n"
-	message := []byte(subject + "\r\n" + body)
+	// 根据不同用途生成不同的邮件内容
+	var subject, body string
+	switch purpose {
+	case "register":
+		subject = "[XDSec Recruitment System] 注册验证码"
+		body = fmt.Sprintf("您的注册验证码是：%s\n\n该验证码5分钟内有效，请勿泄露给他人。\n\n如果这不是您本人的操作，请忽略此邮件。", code)
+	case "reset":
+		subject = "[XDSec Recruitment System] 密码重置验证码"
+		body = fmt.Sprintf("您的密码重置验证码是：%s\n\n该验证码5分钟内有效，请勿泄露给他人。\n\n如果这不是您本人的操作，请忽略此邮件。", code)
+	case "profile":
+		subject = "[XDSec Recruitment System] 个人信息修改验证码"
+		body = fmt.Sprintf("您的个人信息修改验证码是：%s\n\n该验证码5分钟内有效，请勿泄露给他人。\n\n如果这不是您本人的操作，请忽略此邮件。", code)
+	default:
+		return fmt.Errorf("invalid email purpose: %s", purpose)
+	}
 
-	// 认证信息
+	message := []byte("Subject: " + subject + "\r\n" +
+		"Content-Type: text/plain; charset=UTF-8\r\n" +
+		"\r\n" +
+		body + "\r\n")
+
 	auth := smtp.PlainAuth("", smtpUser, smtpPassword, smtpHost)
 
-	// 发送邮件
 	err := smtp.SendMail(
 		smtpHost+":"+smtpPort,
 		auth,
 		from,
-		to,
+		[]string{to},
 		message,
 	)
 
-	if err != nil {
-		fmt.Println("发送失败:", err)
-		return
-	}
-	fmt.Println("邮件发送成功!")
+	return err
 }
