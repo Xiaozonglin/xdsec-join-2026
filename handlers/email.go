@@ -150,14 +150,16 @@ func Register(db *gorm.DB) gin.HandlerFunc {
 
 		// 创建用户
 		user := models.User{
-			UUID:       userUUID,
-			Email:      req.Email,
-			Nickname:   &req.Nickname,
-			Signature:  req.Signature,
-			Role:       "interviewee",
-			Status:     "r1_pending",
-			Directions: "[]",
-			PassWord:   hashedPassword,
+			UUID:               userUUID,
+			Email:              req.Email,
+			Nickname:           &req.Nickname,
+			Signature:          req.Signature,
+			Role:               "interviewee",
+			Status:             "r1_pending",
+			Directions:         "[]",
+			PassedDirections:   "[]",
+			PassedDirectionsBy: "[]",
+			PassWord:           hashedPassword,
 		}
 
 		if err := db.Create(&user).Error; err != nil {

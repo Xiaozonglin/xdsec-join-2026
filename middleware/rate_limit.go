@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -12,8 +13,8 @@ import (
 type IPRateLimiter struct {
 	visitors map[string]*Visitor
 	mu       sync.Mutex
-	rate     int           // 每秒允许请求数
-	burst    int           // 允许突发请求数
+	rate     int // 每秒允许请求数
+	burst    int // 允许突发请求数
 }
 
 // Visitor 访问者
@@ -34,6 +35,11 @@ func NewIPRateLimiter(rate, burst int) *IPRateLimiter {
 // Middleware 返回 Gin 中间件
 func (r *IPRateLimiter) Middleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if r.rate <= 0 || r.burst <= 0 {
+			c.Next()
+			return
+		}
+
 		// 清理过期记录
 		r.mu.Lock()
 		defer r.mu.Unlock()
@@ -51,14 +57,14 @@ func (r *IPRateLimiter) Middleware() gin.HandlerFunc {
 		// 检查访问记录
 		visitor, exists := r.visitors[ip]
 		if !exists {
-			r.visitors[ip] = &Visitor{
+			visitor = &Visitor{
 				timestamp: now,
-				remaining: r.burst - 1,
+				remaining: r.burst,
 			}
+			r.visitors[ip] = visitor
 		} else {
 			elapsed := now.Sub(visitor.timestamp)
 			visitor.timestamp = now
-			visitor.remaining = r.burst - 1
 
 			// 根据时间恢复配额
 			if elapsed > 0 {
@@ -68,6 +74,9 @@ func (r *IPRateLimiter) Middleware() gin.HandlerFunc {
 				}
 			}
 		}
+
+		// 消耗一个配额
+		visitor.remaining -= 1
 
 		// 检查剩余配额
 		if visitor.remaining < 0 {
@@ -80,8 +89,8 @@ func (r *IPRateLimiter) Middleware() gin.HandlerFunc {
 		}
 
 		// 设置响应头
-		c.Header("X-RateLimit-Limit", string(rune(r.burst)))
-		c.Header("X-RateLimit-Remaining", string(rune(visitor.remaining)))
+		c.Header("X-RateLimit-Limit", strconv.Itoa(r.burst))
+		c.Header("X-RateLimit-Remaining", strconv.Itoa(visitor.remaining))
 
 		c.Next()
 	}
