@@ -4,8 +4,10 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"xdsec-join-2026/handlers"
+	"xdsec-join-2026/middleware"
 	"xdsec-join-2026/models"
 
 	"github.com/gin-gonic/gin"
@@ -27,7 +29,29 @@ func main() {
 	}
 
 	// 自动迁移
-	db.AutoMigrate(&models.User{}, &models.Application{}, &models.Announcement{}, &models.Task{}, &models.EmailCode{})
+	db.AutoMigrate(&models.User{}, &models.Application{}, &models.Announcement{}, &models.Task{}, &models.EmailCode{}, &models.EmailRateLimit{})
+
+	// 频率限制中间件（每分钟60次请求）
+	rateLimiter := middleware.NewIPRateLimiter(1, 60)
+
+	// 邮箱验证码专用频率限制器（每分钟1次）
+	// rate=0.05（每秒恢复0.016个 = 每分钟恢复1个），burst=3（初始1个配额）
+	emailCodeRateLimiter := middleware.NewIPRateLimiter(0.016, 1)
+
+	// 启动定时清理任务，每小时清理一次过期的验证码
+	go func() {
+		ticker := time.NewTicker(30 * time.Minute)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			log.Println("开始清理过期的验证码...")
+			if err := db.Where("expires_at < ?", time.Now()).Delete(&models.EmailCode{}).Error; err != nil {
+				log.Printf("清理过期验证码失败: %v", err)
+			} else {
+				log.Println("过期验证码清理完成")
+			}
+		}
+	}()
 
 	r := gin.Default()
 	r.RedirectTrailingSlash = false
@@ -53,11 +77,11 @@ func main() {
 	// 认证与账号
 	authRoute := api.Group("/auth")
 	{
-		authRoute.POST("/email-code", handlers.SendEmailCode(db))
-		authRoute.POST("/register", handlers.Register(db))
-		authRoute.POST("/login", handlers.Login(db))
+		authRoute.POST("/email-code", emailCodeRateLimiter.Middleware(), handlers.SendEmailCode(db))
+		authRoute.POST("/register", rateLimiter.Middleware(), handlers.Register(db))
+		authRoute.POST("/login", rateLimiter.Middleware(), handlers.Login(db))
 		authRoute.POST("/logout", handlers.AuthMiddleware(), handlers.Logout())
-		authRoute.POST("/reset-password", handlers.ResetPassword(db))
+		authRoute.POST("/reset-password", rateLimiter.Middleware(), handlers.ResetPassword(db))
 		authRoute.POST("/change-password", handlers.AuthMiddleware(), handlers.ChangePassword(db))
 		authRoute.GET("/me", handlers.AuthMiddleware(), handlers.GetCurrentUser(db))
 	}
@@ -65,7 +89,7 @@ func main() {
 	// 用户与权限
 	usersRoute := api.Group("/users")
 	{
-		usersRoute.GET("", handlers.AuthMiddleware(), handlers.GetUsers(db))
+		usersRoute.GET("/", handlers.AuthMiddleware(), handlers.GetUsers(db))
 		usersRoute.GET("/:id", handlers.AuthMiddleware(), handlers.RequireInterviewer(), handlers.GetUserDetail(db))
 		usersRoute.PATCH("/me", handlers.AuthMiddleware(), handlers.UpdateProfile(db))
 		usersRoute.POST("/:id/role", handlers.AuthMiddleware(), handlers.RequireInterviewer(), handlers.SetUserRole(db))
@@ -77,7 +101,7 @@ func main() {
 	// 公告
 	announcementsRoute := api.Group("/announcements")
 	{
-		announcementsRoute.GET("", handlers.GetAnnouncements(db))
+		announcementsRoute.GET("", rateLimiter.Middleware(), handlers.GetAnnouncements(db))
 		announcementsRoute.POST("", handlers.AuthMiddleware(), handlers.RequireInterviewer(), handlers.CreateAnnouncement(db))
 		announcementsRoute.PATCH("/:id", handlers.AuthMiddleware(), handlers.RequireInterviewer(), handlers.UpdateAnnouncement(db))
 		announcementsRoute.POST("/:id/pin", handlers.AuthMiddleware(), handlers.RequireInterviewer(), handlers.PinAnnouncement(db))
