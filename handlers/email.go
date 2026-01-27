@@ -35,6 +35,31 @@ func SendEmailCode(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		// 根据purpose验证邮箱状态
+		var user models.User
+		switch req.Purpose {
+		case "register":
+			// 注册验证：检查邮箱是否已注册
+			if err := db.Where("email = ?", req.Email).First(&user).Error; err == nil {
+				c.JSON(http.StatusConflict, gin.H{"ok": false, "message": "该邮箱已被注册，请直接登录"})
+				return
+			}
+		case "reset":
+			// 重置密码验证：检查邮箱是否存在用户
+			if err := db.Where("email = ?", req.Email).First(&user).Error; err != nil {
+				c.JSON(http.StatusNotFound, gin.H{"ok": false, "message": "该邮箱未注册账号"})
+				return
+			}
+		}
+
+		// 检查发送频率限制（每分钟一次）
+		var rateLimit models.EmailRateLimit
+		oneMinuteAgo := time.Now().Add(-1 * time.Minute)
+		if err := db.Where("email = ? AND last_sent > ?", req.Email, oneMinuteAgo).First(&rateLimit).Error; err == nil {
+			c.JSON(http.StatusTooManyRequests, gin.H{"ok": false, "message": "发送过于频繁，请1分钟后再试"})
+			return
+		}
+
 		// 生成验证码
 		code, err := auth.GenerateEmailCode()
 		if err != nil {
@@ -42,7 +67,7 @@ func SendEmailCode(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		// 清理该邮箱的旧验证码
+		// 清理该邮箱的旧验证码（包括已使用和过期的）
 		db.Where("email = ? AND purpose = ?", req.Email, req.Purpose).Delete(&models.EmailCode{})
 
 		// 创建新的验证码记录
@@ -58,6 +83,21 @@ func SendEmailCode(db *gorm.DB) gin.HandlerFunc {
 
 		if err := db.Create(&emailCode).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "message": "服务器错误"})
+			return
+		}
+
+		// 更新或创建频率限制记录
+		rateLimitUUID, _ := uuid.NewUUID()
+		if err := db.Where("email = ?", req.Email).Assign(models.EmailRateLimit{
+			Email:    req.Email,
+			LastSent: time.Now(),
+		}).FirstOrCreate(&models.EmailRateLimit{
+			UUID:     rateLimitUUID,
+			Email:    req.Email,
+			LastSent: time.Now(),
+		}).Error; err != nil {
+			// 记录失败不影响发送，仅记录日志
+			c.JSON(http.StatusOK, gin.H{"ok": true, "message": "sent"})
 			return
 		}
 
@@ -215,7 +255,7 @@ func Login(db *gorm.DB) gin.HandlerFunc {
 		csrfToken := auth.GenerateCSRFToken()
 
 		// 设置Cookie
-		c.SetSameSite(http.SameSiteLaxMode)
+		c.SetSameSite(http.SameSiteStrictMode)
 		c.SetCookie("session_id", token, 7*24*3600, "/", "", false, true)
 		c.SetCookie("csrf_token", csrfToken, 7*24*3600, "/", "", false, false)
 

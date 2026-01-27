@@ -67,3 +67,10 @@ type EmailCode struct {
 	Used      bool      `gorm:"column:used;default:false"`
 	CreatedAt time.Time
 }
+
+type EmailRateLimit struct {
+	UUID      uuid.UUID `gorm:"type:char(36);primarykey"`
+	Email     string    `gorm:"column:email;index;not null"`
+	LastSent  time.Time `gorm:"column:last_sent;not null"`
+	CreatedAt time.Time
+}

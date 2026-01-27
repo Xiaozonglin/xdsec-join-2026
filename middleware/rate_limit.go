@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"math"
 	"net/http"
 	"strconv"
 	"sync"
@@ -13,18 +14,20 @@ import (
 type IPRateLimiter struct {
 	visitors map[string]*Visitor
 	mu       sync.Mutex
-	rate     int // 每秒允许请求数
-	burst    int // 允许突发请求数
+	rate     float64 // 每秒恢复的配额数
+	burst    int     // 初始配额（最大配额）
 }
 
 // Visitor 访问者
 type Visitor struct {
 	timestamp time.Time
-	remaining int
+	remaining float64
 }
 
 // NewIPRateLimiter 创建新的频率限制器
-func NewIPRateLimiter(rate, burst int) *IPRateLimiter {
+// rate: 每秒恢复的配额数（例如 1 表示每秒恢复1个，0.05 表示每20秒恢复1个，即每分钟3个）
+// burst: 初始配额和最大配额
+func NewIPRateLimiter(rate float64, burst int) *IPRateLimiter {
 	return &IPRateLimiter{
 		visitors: make(map[string]*Visitor),
 		rate:     rate,
@@ -46,7 +49,8 @@ func (r *IPRateLimiter) Middleware() gin.HandlerFunc {
 
 		now := time.Now()
 		for ip, visitor := range r.visitors {
-			if now.Sub(visitor.timestamp) > time.Second*time.Duration(r.burst)/time.Duration(r.rate) {
+			// 清理超过恢复周期的记录
+			if now.Sub(visitor.timestamp) > time.Duration(float64(r.burst)/r.rate)*time.Second {
 				delete(r.visitors, ip)
 			}
 		}
@@ -59,7 +63,7 @@ func (r *IPRateLimiter) Middleware() gin.HandlerFunc {
 		if !exists {
 			visitor = &Visitor{
 				timestamp: now,
-				remaining: r.burst,
+				remaining: float64(r.burst),
 			}
 			r.visitors[ip] = visitor
 		} else {
@@ -68,9 +72,10 @@ func (r *IPRateLimiter) Middleware() gin.HandlerFunc {
 
 			// 根据时间恢复配额
 			if elapsed > 0 {
-				visitor.remaining += int(elapsed.Seconds()) * r.rate
-				if visitor.remaining > r.burst {
-					visitor.remaining = r.burst
+				recovered := elapsed.Seconds() * r.rate
+				visitor.remaining += recovered
+				if visitor.remaining > float64(r.burst) {
+					visitor.remaining = float64(r.burst)
 				}
 			}
 		}
@@ -90,7 +95,7 @@ func (r *IPRateLimiter) Middleware() gin.HandlerFunc {
 
 		// 设置响应头
 		c.Header("X-RateLimit-Limit", strconv.Itoa(r.burst))
-		c.Header("X-RateLimit-Remaining", strconv.Itoa(visitor.remaining))
+		c.Header("X-RateLimit-Remaining", strconv.Itoa(int(math.Floor(visitor.remaining))))
 
 		c.Next()
 	}
