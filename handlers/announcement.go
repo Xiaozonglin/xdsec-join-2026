@@ -149,7 +149,7 @@ func GetAnnouncements(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var announcements []models.Announcement
 
-		// 按置顶和创建时间排序
+		// 按置顶和创建时间排序，并预加载作者信息
 		if err := db.Order("pinned DESC, created_at DESC").Find(&announcements).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "message": "服务器错误"})
 			return
@@ -157,14 +157,21 @@ func GetAnnouncements(db *gorm.DB) gin.HandlerFunc {
 
 		items := make([]gin.H, 0, len(announcements))
 		for _, a := range announcements {
+			// 查询作者昵称
+			var author models.User
+			authorNickname := "未知用户"
+			if err := db.Where("uuid = ?", a.AuthorId).First(&author).Error; err == nil && author.Nickname != nil {
+				authorNickname = *author.Nickname
+			}
+
 			items = append(items, gin.H{
-				"id":        a.UUID.String(),
-				"title":     a.Title,
-				"content":   a.Content,
-				"pinned":    a.Pinned,
-				"authorId":  a.AuthorId.String(),
-				"createdAt": a.CreatedAt,
-				"updatedAt": a.UpdatedAt,
+				"id":              a.UUID.String(),
+				"title":           a.Title,
+				"content":         a.Content,
+				"pinned":          a.Pinned,
+				"authorNickname":  authorNickname,
+				"createdAt":       a.CreatedAt,
+				"updatedAt":       a.UpdatedAt,
 			})
 		}
 
