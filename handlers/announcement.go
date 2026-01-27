@@ -155,16 +155,39 @@ func GetAnnouncements(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		authorIds := make([]uuid.UUID, 0, len(announcements))
+		authorIdSet := make(map[uuid.UUID]struct{})
+		for _, announcement := range announcements {
+			if _, exists := authorIdSet[announcement.AuthorId]; !exists {
+				authorIdSet[announcement.AuthorId] = struct{}{}
+				authorIds = append(authorIds, announcement.AuthorId)
+			}
+		}
+
+		authorNames := make(map[string]string)
+		if len(authorIds) > 0 {
+			var authors []models.User
+			if err := db.Select("uuid", "nickname", "email").Where("uuid IN ?", authorIds).Find(&authors).Error; err == nil {
+				for _, author := range authors {
+					name := author.Email
+					if author.Nickname != nil && *author.Nickname != "" {
+						name = *author.Nickname
+					}
+					authorNames[author.UUID.String()] = name
+				}
+			}
+		}
+
 		items := make([]gin.H, 0, len(announcements))
 		for _, a := range announcements {
 			items = append(items, gin.H{
-				"id":        a.UUID.String(),
-				"title":     a.Title,
-				"content":   a.Content,
-				"pinned":    a.Pinned,
-				"authorId":  a.AuthorId.String(),
-				"createdAt": a.CreatedAt,
-				"updatedAt": a.UpdatedAt,
+				"id":             a.UUID.String(),
+				"title":          a.Title,
+				"content":        a.Content,
+				"pinned":         a.Pinned,
+				"authorNickname": authorNames[a.AuthorId.String()],
+				"createdAt":      a.CreatedAt,
+				"updatedAt":      a.UpdatedAt,
 			})
 		}
 

@@ -14,12 +14,17 @@ import (
 // GetUsers 获取用户列表
 func GetUsers(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		currentRole := GetCurrentUserRole(c)
+
 		// 获取查询参数
 		role := c.Query("role")
 		query := c.Query("q")
 
 		// 构建查询
 		tx := db.Model(&models.User{})
+		if currentRole == "interviewer" {
+			tx = tx.Preload("Application")
+		}
 
 		// 按角色过滤
 		if role != "" {
@@ -43,8 +48,6 @@ func GetUsers(db *gorm.DB) gin.HandlerFunc {
 
 		// 构建响应
 		items := make([]gin.H, 0, len(users))
-		currentRole := GetCurrentUserRole(c)
-
 		for _, user := range users {
 			userData := gin.H{
 				"id":        user.UUID.String(),
