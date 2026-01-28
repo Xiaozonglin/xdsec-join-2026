@@ -32,6 +32,14 @@ func CreateApplication(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		// 兼容中文输入
+		switch req.Gender {
+		case "男":
+			req.Gender = "male"
+		case "女":
+			req.Gender = "female"
+		}
+
 		// 验证性别
 		if req.Gender != "male" && req.Gender != "female" {
 			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "message": "后端不承认非二元性别"})
