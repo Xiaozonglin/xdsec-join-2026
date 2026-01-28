@@ -59,15 +59,54 @@ func CreateApplication(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		// 序列化方向
+		directionsJSON, _ := json.Marshal(req.Directions)
+
 		// 检查是否已存在申请
 		var existingApp models.Application
 		if err := db.Where("user_id = ?", userUUID).First(&existingApp).Error; err == nil {
-			c.JSON(http.StatusConflict, gin.H{"ok": false, "message": "申请已存在"})
+			// 申请已存在，检查是否有数据变化
+			directionsMatch := existingApp.Directions == string(directionsJSON)
+			dataChanged := existingApp.RealName != req.RealName ||
+				existingApp.Phone != req.Phone ||
+				existingApp.Gender != req.Gender ||
+				existingApp.Department != req.Department ||
+				existingApp.Major != req.Major ||
+				existingApp.StudentId != req.StudentId ||
+				!directionsMatch ||
+				existingApp.Resume != req.Resume
+
+			if !dataChanged {
+				c.JSON(http.StatusTeapot, gin.H{"ok": false, "message": "申请数据未发生变化"})
+				return
+			}
+
+			// 数据有变化，更新申请
+			updates := map[string]interface{}{
+				"real_name":  req.RealName,
+				"phone":      req.Phone,
+				"gender":     req.Gender,
+				"department": req.Department,
+				"major":      req.Major,
+				"student_id": req.StudentId,
+				"directions": string(directionsJSON),
+				"resume":     req.Resume,
+			}
+
+			if err := db.Model(&existingApp).Updates(updates).Error; err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "message": "服务器更新申请时发生错误"})
+				return
+			}
+
+			// 更新用户的方向信息
+			if err := db.Model(&models.User{}).Where("uuid = ?", userUUID).Update("directions", string(directionsJSON)).Error; err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "message": "服务器更新用户方向时发生错误"})
+				return
+			}
+
+			c.JSON(http.StatusOK, gin.H{"ok": true, "message": "修改申请信息成功"})
 			return
 		}
-
-		// 序列化方向
-		directionsJSON, _ := json.Marshal(req.Directions)
 
 		// 创建申请
 		application := models.Application{

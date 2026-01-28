@@ -110,8 +110,21 @@ func SendEmailCode(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-// ValidateEmailCode 验证邮箱验证码
+// ValidateEmailCode 验证邮箱验证码（不标记为已使用）
 func ValidateEmailCode(db *gorm.DB, email, code, purpose string) bool {
+	var emailCode models.EmailCode
+	result := db.Where("email = ? AND code = ? AND purpose = ? AND used = ? AND expires_at > ?",
+		email, code, purpose, false, time.Now()).First(&emailCode)
+
+	if result.Error != nil {
+		return false
+	}
+
+	return true
+}
+
+// MarkEmailCodeUsed 标记邮箱验证码为已使用
+func MarkEmailCodeUsed(db *gorm.DB, email, code, purpose string) bool {
 	var emailCode models.EmailCode
 	result := db.Where("email = ? AND code = ? AND purpose = ? AND used = ? AND expires_at > ?",
 		email, code, purpose, false, time.Now()).First(&emailCode)
@@ -143,7 +156,7 @@ func Register(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		// 验证邮箱验证码
+			// 验证邮箱验证码（不标记为已使用）
 		if !ValidateEmailCode(db, req.Email, req.EmailCode, "register") {
 			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "message": "验证码无效或已过期"})
 			return
@@ -171,6 +184,12 @@ func Register(db *gorm.DB) gin.HandlerFunc {
 		// 检查昵称是否已存在
 		if err := db.Where("nickname = ?", req.Nickname).First(&existingUser).Error; err == nil {
 			c.JSON(http.StatusConflict, gin.H{"ok": false, "message": "昵称已被使用"})
+			return
+		}
+
+		// 所有参数校验通过后，标记验证码为已使用
+		if !MarkEmailCodeUsed(db, req.Email, req.EmailCode, "register") {
+			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "message": "验证码验证失败"})
 			return
 		}
 
@@ -365,7 +384,7 @@ func ResetPassword(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		// 验证邮箱验证码
+		// 验证邮箱验证码（不标记为已使用）
 		if !ValidateEmailCode(db, req.Email, req.EmailCode, "reset") {
 			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "message": "验证码无效或已过期"})
 			return
@@ -381,6 +400,12 @@ func ResetPassword(db *gorm.DB) gin.HandlerFunc {
 		// 验证新密码
 		if len(req.NewPassword) < 8 {
 			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "message": "新密码长度不能少于8位"})
+			return
+		}
+
+		// 所有参数校验通过后，标记验证码为已使用
+		if !MarkEmailCodeUsed(db, req.Email, req.EmailCode, "reset") {
+			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "message": "验证码验证失败"})
 			return
 		}
 

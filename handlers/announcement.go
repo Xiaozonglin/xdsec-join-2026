@@ -102,7 +102,7 @@ func UpdateAnnouncement(db *gorm.DB) gin.HandlerFunc {
 
 // PinAnnouncementRequest 置顶公告请求
 type PinAnnouncementRequest struct {
-	Pinned bool `json:"pinned" binding:"required"`
+	Pinned bool `json:"pinned"`
 }
 
 // PinAnnouncement 置顶或取消置顶公告（面试官）
@@ -116,20 +116,13 @@ func PinAnnouncement(db *gorm.DB) gin.HandlerFunc {
 
 		var req PinAnnouncementRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "message": "参数校验失败"})
-			return
-		}
-
-		// 解析UUID
-		announcementUUID, err := uuid.Parse(announcementID)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "message": "参数校验失败"})
+			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "message": "参数校验失败" + err.Error()})
 			return
 		}
 
 		// 查找公告
 		var announcement models.Announcement
-		if err := db.Where("uuid = ?", announcementUUID).First(&announcement).Error; err != nil {
+		if err := db.Where("uuid = ?", announcementID).First(&announcement).Error; err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"ok": false, "message": "公告不存在"})
 			return
 		}

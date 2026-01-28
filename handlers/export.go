@@ -33,7 +33,7 @@ func ExportApplications(db *gorm.DB) gin.HandlerFunc {
 		headers := []string{
 			"用户ID", "邮箱", "昵称", "签名", "面试状态",
 			"真实姓名", "手机号", "性别", "学院", "专业", "学号",
-			"申请方向", "简历", "创建时间", "更新时间",
+			"申请方向", "简历", "通过方向", "通过面试官", "创建时间", "更新时间",
 		}
 		headerRow := sheet.AddRow()
 		for _, header := range headers {
@@ -102,7 +102,7 @@ func ExportApplications(db *gorm.DB) gin.HandlerFunc {
 				passedStr := ""
 				for i, dir := range passedDirections {
 					if i > 0 {
-						passedStr += ", "
+						passedStr += "&"
 					}
 					passedStr += dir
 				}

@@ -38,17 +38,27 @@ func main() {
 	// rate=0.05（每秒恢复0.016个 = 每分钟恢复1个），burst=3（初始1个配额）
 	emailCodeRateLimiter := middleware.NewIPRateLimiter(0.016, 1)
 
-	// 启动定时清理任务，每小时清理一次过期的验证码
+	// 启动定时清理任务，每30分钟清理一次过期的验证码
 	go func() {
-		ticker := time.NewTicker(30 * time.Minute)
+		ticker := time.NewTicker(10 * time.Minute)
 		defer ticker.Stop()
 
 		for range ticker.C {
 			log.Println("开始清理过期的验证码...")
-			if err := db.Where("expires_at < ?", time.Now()).Delete(&models.EmailCode{}).Error; err != nil {
-				log.Printf("清理过期验证码失败: %v", err)
+			now := time.Now()
+			result := db.Where("expires_at < ?", now).Delete(&models.EmailCode{})
+			if result.Error != nil {
+				log.Printf("清理过期验证码失败: %v", result.Error)
 			} else {
-				log.Println("过期验证码清理完成")
+				log.Printf("过期验证码清理完成，共清理 %d 条记录", result.RowsAffected)
+			}
+
+			// 同时清理超过24小时的邮箱频率限制记录
+			result2 := db.Where("last_sent < ?", now.Add(-24*time.Hour)).Delete(&models.EmailRateLimit{})
+			if result2.Error != nil {
+				log.Printf("清理邮箱频率限制记录失败: %v", result2.Error)
+			} else {
+				log.Printf("邮箱频率限制记录清理完成，共清理 %d 条记录", result2.RowsAffected)
 			}
 		}
 	}()
