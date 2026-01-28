@@ -214,14 +214,41 @@ func GetTasks(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		assignedIds := make([]uuid.UUID, 0, len(tasks))
+		assignedSet := make(map[uuid.UUID]struct{})
+		for _, task := range tasks {
+			if _, exists := assignedSet[task.AssignedBy]; !exists {
+				assignedSet[task.AssignedBy] = struct{}{}
+				assignedIds = append(assignedIds, task.AssignedBy)
+			}
+		}
+
+		assignedNames := make(map[string]string)
+		if len(assignedIds) > 0 {
+			var users []models.User
+			if err := db.Select("uuid", "nickname", "email").Where("uuid IN ?", assignedIds).Find(&users).Error; err == nil {
+				for _, user := range users {
+					name := user.Email
+					if user.Nickname != nil && *user.Nickname != "" {
+						name = *user.Nickname
+					}
+					assignedNames[user.UUID.String()] = name
+				}
+			}
+		}
+
 		items := make([]gin.H, 0, len(tasks))
 		for _, t := range tasks {
+			assignedBy := assignedNames[t.AssignedBy.String()]
+			if assignedBy == "" {
+				assignedBy = t.AssignedBy.String()
+			}
 			items = append(items, gin.H{
 				"id":           t.UUID.String(),
 				"title":        t.Title,
 				"description":  t.Description,
 				"targetUserId": t.TargetUserId.String(),
-				"assignedBy":   t.AssignedBy.String(),
+				"assignedBy":   assignedBy,
 				"report":       t.Report,
 				"createdAt":    t.CreatedAt,
 				"updatedAt":    t.UpdatedAt,
