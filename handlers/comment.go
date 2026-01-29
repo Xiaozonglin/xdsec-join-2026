@@ -146,3 +146,118 @@ func GetComments(db *gorm.DB) gin.HandlerFunc {
 		})
 	}
 }
+
+// UpdateCommentRequest 更新评论请求
+type UpdateCommentRequest struct {
+	Content string `json:"content" binding:"required,max=500"`
+}
+
+// UpdateComment 更新评论
+func UpdateComment(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		commentID := c.Param("id")
+		if commentID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "message": "参数校验失败"})
+			return
+		}
+
+		var req UpdateCommentRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "message": "参数校验失败"})
+			return
+		}
+
+		// 获取当前用户
+		userUUID, ok := GetCurrentUserUUID(c)
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{"ok": false, "message": "未登录"})
+			return
+		}
+
+		// 检查是否为面试官
+		if GetCurrentUserRole(c) != "interviewer" {
+			c.JSON(http.StatusForbidden, gin.H{"ok": false, "message": "只有面试官可以修改评论"})
+			return
+		}
+
+		// 解析评论UUID
+		commentUUID, err := uuid.Parse(commentID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "message": "参数校验失败"})
+			return
+		}
+
+		// 查找评论
+		var comment models.Comment
+		if err := db.Where("uuid = ?", commentUUID).First(&comment).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"ok": false, "message": "评论不存在"})
+			return
+		}
+
+		// 检查是否为评论创建者
+		if comment.InterviewerID != userUUID {
+			c.JSON(http.StatusForbidden, gin.H{"ok": false, "message": "只能修改自己的评论"})
+			return
+		}
+
+		// 更新评论
+		if err := db.Model(&comment).Update("content", req.Content).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "message": "服务器错误"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	}
+}
+
+// DeleteComment 删除评论
+func DeleteComment(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		commentID := c.Param("id")
+		if commentID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "message": "参数校验失败"})
+			return
+		}
+
+		// 获取当前用户
+		userUUID, ok := GetCurrentUserUUID(c)
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{"ok": false, "message": "未登录"})
+			return
+		}
+
+		// 检查是否为面试官
+		if GetCurrentUserRole(c) != "interviewer" {
+			c.JSON(http.StatusForbidden, gin.H{"ok": false, "message": "只有面试官可以删除评论"})
+			return
+		}
+
+		// 解析评论UUID
+		commentUUID, err := uuid.Parse(commentID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "message": "参数校验失败"})
+			return
+		}
+
+		// 查找评论
+		var comment models.Comment
+		if err := db.Where("uuid = ?", commentUUID).First(&comment).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"ok": false, "message": "评论不存在"})
+			return
+		}
+
+		// 检查是否为评论创建者
+		if comment.InterviewerID != userUUID {
+			c.JSON(http.StatusForbidden, gin.H{"ok": false, "message": "只能删除自己的评论"})
+			return
+		}
+
+		// 删除评论
+		if err := db.Delete(&comment).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "message": "服务器错误"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	}
+}

@@ -152,6 +152,8 @@ func main() {
 	{
 		commentsRoute.POST("", handlers.AuthMiddleware(), handlers.RequireInterviewer(), handlers.CreateComment(db))
 		commentsRoute.GET("/:intervieweeId", handlers.AuthMiddleware(), handlers.RequireInterviewer(), handlers.GetComments(db))
+		commentsRoute.PATCH("/:id", handlers.AuthMiddleware(), handlers.RequireInterviewer(), handlers.UpdateComment(db))
+		commentsRoute.DELETE("/:id", handlers.AuthMiddleware(), handlers.RequireInterviewer(), handlers.DeleteComment(db))
 	}
 
 	// 数据导出
