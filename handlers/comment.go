@@ -13,7 +13,7 @@ import (
 // CreateCommentRequest 创建评论请求
 type CreateCommentRequest struct {
 	IntervieweeID string `json:"intervieweeId" binding:"required"`
-	Content      string `json:"content" binding:"required,max=500"`
+	Content       string `json:"content" binding:"required,max=500"`
 }
 
 // CreateComment 创建评论（面试官）
@@ -63,7 +63,7 @@ func CreateComment(db *gorm.DB) gin.HandlerFunc {
 		comment := models.Comment{
 			UUID:          commentUUID,
 			Content:       req.Content,
-			IntervieweeID:  intervieweeUUID,
+			IntervieweeID: intervieweeUUID,
 			InterviewerID: interviewerUUID,
 		}
 
@@ -129,12 +129,12 @@ func GetComments(db *gorm.DB) gin.HandlerFunc {
 			}
 
 			items = append(items, gin.H{
-				"id":             comment.UUID.String(),
-				"content":        template.HTMLEscapeString(comment.Content),
+				"id":              comment.UUID.String(),
+				"content":         template.HTMLEscapeString(comment.Content),
 				"intervieweeId":   comment.IntervieweeID.String(),
-				"interviewerId":  comment.InterviewerID.String(),
+				"interviewerId":   comment.InterviewerID.String(),
 				"interviewerName": template.HTMLEscapeString(interviewerName),
-				"createdAt":      comment.CreatedAt,
+				"createdAt":       comment.CreatedAt,
 			})
 		}
 
@@ -152,7 +152,7 @@ type UpdateCommentRequest struct {
 	Content string `json:"content" binding:"required,max=500"`
 }
 
-// UpdateComment 更新评论
+// UpdateComment 更新评论（面试官，仅可修改本人评论）
 func UpdateComment(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		commentID := c.Param("id")
@@ -167,40 +167,35 @@ func UpdateComment(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		// 获取当前用户
-		userUUID, ok := GetCurrentUserUUID(c)
-		if !ok {
-			c.JSON(http.StatusUnauthorized, gin.H{"ok": false, "message": "未登录"})
-			return
-		}
-
 		// 检查是否为面试官
 		if GetCurrentUserRole(c) != "interviewer" {
 			c.JSON(http.StatusForbidden, gin.H{"ok": false, "message": "只有面试官可以修改评论"})
 			return
 		}
 
-		// 解析评论UUID
+		interviewerUUID, ok := GetCurrentUserUUID(c)
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{"ok": false, "message": "未登录"})
+			return
+		}
+
 		commentUUID, err := uuid.Parse(commentID)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "message": "参数校验失败"})
 			return
 		}
 
-		// 查找评论
 		var comment models.Comment
 		if err := db.Where("uuid = ?", commentUUID).First(&comment).Error; err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"ok": false, "message": "评论不存在"})
 			return
 		}
 
-		// 检查是否为评论创建者
-		if comment.InterviewerID != userUUID {
-			c.JSON(http.StatusForbidden, gin.H{"ok": false, "message": "只能修改自己的评论"})
+		if comment.InterviewerID != interviewerUUID {
+			c.JSON(http.StatusForbidden, gin.H{"ok": false, "message": "无权限修改该评论"})
 			return
 		}
 
-		// 更新评论
 		if err := db.Model(&comment).Update("content", req.Content).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "message": "服务器错误"})
 			return
@@ -210,19 +205,12 @@ func UpdateComment(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-// DeleteComment 删除评论
+// DeleteComment 删除评论（面试官，仅可删除本人评论）
 func DeleteComment(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		commentID := c.Param("id")
 		if commentID == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "message": "参数校验失败"})
-			return
-		}
-
-		// 获取当前用户
-		userUUID, ok := GetCurrentUserUUID(c)
-		if !ok {
-			c.JSON(http.StatusUnauthorized, gin.H{"ok": false, "message": "未登录"})
 			return
 		}
 
@@ -232,27 +220,29 @@ func DeleteComment(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		// 解析评论UUID
+		interviewerUUID, ok := GetCurrentUserUUID(c)
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{"ok": false, "message": "未登录"})
+			return
+		}
+
 		commentUUID, err := uuid.Parse(commentID)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "message": "参数校验失败"})
 			return
 		}
 
-		// 查找评论
 		var comment models.Comment
 		if err := db.Where("uuid = ?", commentUUID).First(&comment).Error; err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"ok": false, "message": "评论不存在"})
 			return
 		}
 
-		// 检查是否为评论创建者
-		if comment.InterviewerID != userUUID {
-			c.JSON(http.StatusForbidden, gin.H{"ok": false, "message": "只能删除自己的评论"})
+		if comment.InterviewerID != interviewerUUID {
+			c.JSON(http.StatusForbidden, gin.H{"ok": false, "message": "无权限删除该评论"})
 			return
 		}
 
-		// 删除评论
 		if err := db.Delete(&comment).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "message": "服务器错误"})
 			return
