@@ -156,7 +156,7 @@ func Register(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-			// 验证邮箱验证码（不标记为已使用）
+		// 验证邮箱验证码（不标记为已使用）
 		if !ValidateEmailCode(db, req.Email, req.EmailCode, "register") {
 			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "message": "验证码无效或已过期"})
 			return
@@ -274,9 +274,9 @@ func Login(db *gorm.DB) gin.HandlerFunc {
 		csrfToken := auth.GenerateCSRFToken()
 
 		// 设置Cookie
-		c.SetSameSite(http.SameSiteStrictMode)
-		c.SetCookie("session_id", token, 7*24*3600, "/", "", false, true)
-		c.SetCookie("csrf_token", csrfToken, 7*24*3600, "/", "", false, false)
+		c.SetSameSite(http.SameSiteNoneMode)
+		c.SetCookie("session_id", token, 7*24*3600, "/", "", true, true)
+		c.SetCookie("csrf_token", csrfToken, 7*24*3600, "/", "", true, false)
 
 		// 解析Directions JSON
 		var directions []string

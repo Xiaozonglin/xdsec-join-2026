@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -14,7 +13,7 @@ import (
 )
 
 var (
-	jwtSecret       = []byte(os.Getenv("secretKey"))
+	jwtSecret       = []byte("change-this-secret-in-production")
 	ErrInvalidToken = errors.New("invalid token")
 	ErrExpiredToken = errors.New("token expired")
 )
