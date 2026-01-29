@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	jwtSecret       = []byte(os.Getenv("secret-key"))
+	jwtSecret       = []byte(os.Getenv("secretKey"))
 	ErrInvalidToken = errors.New("invalid token")
 	ErrExpiredToken = errors.New("token expired")
 )
