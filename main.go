@@ -24,9 +24,17 @@ func main() {
 
 	dsn := os.Getenv("dsn")
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+
+	sqlDB, err := db.DB()
 	if err != nil {
-		panic("数据库连接失败: " + err.Error())
+		panic("获取数据库连接失败: " + err.Error())
 	}
+
+	// 关键配置
+	sqlDB.SetMaxOpenConns(20)                  // 最大连接数
+	sqlDB.SetMaxIdleConns(5)                   // 空闲连接数
+	sqlDB.SetConnMaxLifetime(90 * time.Second) // 连接最大存活时间，建议小于数据库的wait_timeout
+	sqlDB.SetConnMaxIdleTime(60 * time.Second) // 空闲连接最大存活时间
 
 	// 自动迁移
 	db.AutoMigrate(&models.User{}, &models.Application{}, &models.Announcement{}, &models.Task{}, &models.EmailCode{}, &models.EmailRateLimit{}, &models.Comment{})
