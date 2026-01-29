@@ -13,14 +13,14 @@ import (
 
 // CreateApplicationRequest 创建申请请求
 type CreateApplicationRequest struct {
-	RealName   string   `json:"realName" binding:"required"`
-	Phone      string   `json:"phone" binding:"required"`
+	RealName   string   `json:"realName" binding:"required,max=10"`
+	Phone      string   `json:"phone" binding:"required,max=15"`
 	Gender     string   `json:"gender" binding:"required"`
-	Department string   `json:"department" binding:"required"`
-	Major      string   `json:"major" binding:"required"`
-	StudentId  string   `json:"studentId" binding:"required"`
-	Directions []string `json:"directions" binding:"required"`
-	Resume     string   `json:"resume" binding:"required"`
+	Department string   `json:"department" binding:"required,max=20"`
+	Major      string   `json:"major" binding:"required,max=20"`
+	StudentId  string   `json:"studentId" binding:"required,max=20"`
+	Directions []string `json:"directions" binding:"required,max=30"`
+	Resume     string   `json:"resume" binding:"required,max=10000"`
 }
 
 // CreateApplication 创建申请

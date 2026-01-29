@@ -87,6 +87,13 @@ func UpdateTask(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		// 获取当前用户
+		userUUID, ok := GetCurrentUserUUID(c)
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{"ok": false, "message": "未登录"})
+			return
+		}
+
 		// 解析UUID
 		taskUUID, err := uuid.Parse(taskID)
 		if err != nil {
@@ -98,6 +105,12 @@ func UpdateTask(db *gorm.DB) gin.HandlerFunc {
 		var task models.Task
 		if err := db.Where("uuid = ?", taskUUID).First(&task).Error; err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"ok": false, "message": "任务不存在"})
+			return
+		}
+
+		// 检查是否为任务创建者
+		if task.AssignedBy != userUUID {
+			c.JSON(http.StatusForbidden, gin.H{"ok": false, "message": "只能修改自己布置的任务"})
 			return
 		}
 
@@ -214,59 +227,59 @@ func GetTasks(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-	// 收集所有相关的用户ID（布置者和目标用户）
-	userIds := make([]uuid.UUID, 0, len(tasks)*2)
-	userSet := make(map[uuid.UUID]struct{})
-	for _, task := range tasks {
-		if _, exists := userSet[task.AssignedBy]; !exists {
-			userSet[task.AssignedBy] = struct{}{}
-			userIds = append(userIds, task.AssignedBy)
-		}
-		if _, exists := userSet[task.TargetUserId]; !exists {
-			userSet[task.TargetUserId] = struct{}{}
-			userIds = append(userIds, task.TargetUserId)
-		}
-	}
-
-	// 批量查询用户信息
-	userNames := make(map[string]string)
-	if len(userIds) > 0 {
-		var users []models.User
-		if err := db.Select("uuid", "nickname", "email").Where("uuid IN ?", userIds).Find(&users).Error; err == nil {
-			for _, user := range users {
-				name := user.Email
-				if user.Nickname != nil && *user.Nickname != "" {
-					name = *user.Nickname
-				}
-				userNames[user.UUID.String()] = name
+		// 收集所有相关的用户ID（布置者和目标用户）
+		userIds := make([]uuid.UUID, 0, len(tasks)*2)
+		userSet := make(map[uuid.UUID]struct{})
+		for _, task := range tasks {
+			if _, exists := userSet[task.AssignedBy]; !exists {
+				userSet[task.AssignedBy] = struct{}{}
+				userIds = append(userIds, task.AssignedBy)
+			}
+			if _, exists := userSet[task.TargetUserId]; !exists {
+				userSet[task.TargetUserId] = struct{}{}
+				userIds = append(userIds, task.TargetUserId)
 			}
 		}
-	}
 
-	items := make([]gin.H, 0, len(tasks))
-	for _, t := range tasks {
-		assignedBy := userNames[t.AssignedBy.String()]
-		if assignedBy == "" {
-			assignedBy = t.AssignedBy.String()
+		// 批量查询用户信息
+		userNames := make(map[string]string)
+		if len(userIds) > 0 {
+			var users []models.User
+			if err := db.Select("uuid", "nickname", "email").Where("uuid IN ?", userIds).Find(&users).Error; err == nil {
+				for _, user := range users {
+					name := user.Email
+					if user.Nickname != nil && *user.Nickname != "" {
+						name = *user.Nickname
+					}
+					userNames[user.UUID.String()] = name
+				}
+			}
 		}
 
-		targetUserName := userNames[t.TargetUserId.String()]
-		if targetUserName == "" {
-			targetUserName = t.TargetUserId.String()
-		}
+		items := make([]gin.H, 0, len(tasks))
+		for _, t := range tasks {
+			assignedBy := userNames[t.AssignedBy.String()]
+			if assignedBy == "" {
+				assignedBy = t.AssignedBy.String()
+			}
 
-		items = append(items, gin.H{
-			"id":           t.UUID.String(),
-			"title":        t.Title,
-			"description":  t.Description,
-			"targetUserId": t.TargetUserId.String(),
-			"targetUserName": targetUserName,
-			"assignedBy":   assignedBy,
-			"report":       t.Report,
-			"createdAt":    t.CreatedAt,
-			"updatedAt":    t.UpdatedAt,
-		})
-	}
+			targetUserName := userNames[t.TargetUserId.String()]
+			if targetUserName == "" {
+				targetUserName = t.TargetUserId.String()
+			}
+
+			items = append(items, gin.H{
+				"id":             t.UUID.String(),
+				"title":          t.Title,
+				"description":    t.Description,
+				"targetUserId":   t.TargetUserId.String(),
+				"targetUserName": targetUserName,
+				"assignedBy":     assignedBy,
+				"report":         t.Report,
+				"createdAt":      t.CreatedAt,
+				"updatedAt":      t.UpdatedAt,
+			})
+		}
 
 		c.JSON(http.StatusOK, gin.H{
 			"ok": true,
@@ -286,6 +299,13 @@ func DeleteTask(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		// 获取当前用户
+		userUUID, ok := GetCurrentUserUUID(c)
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{"ok": false, "message": "未登录"})
+			return
+		}
+
 		// 解析UUID
 		taskUUID, err := uuid.Parse(taskID)
 		if err != nil {
@@ -297,6 +317,12 @@ func DeleteTask(db *gorm.DB) gin.HandlerFunc {
 		var task models.Task
 		if err := db.Where("uuid = ?", taskUUID).First(&task).Error; err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"ok": false, "message": "任务不存在"})
+			return
+		}
+
+		// 检查是否为任务创建者
+		if task.AssignedBy != userUUID {
+			c.JSON(http.StatusForbidden, gin.H{"ok": false, "message": "只能删除自己布置的任务"})
 			return
 		}
 

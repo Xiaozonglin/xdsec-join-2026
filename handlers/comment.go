@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"html/template"
 	"net/http"
 	"xdsec-join-2026/models"
 
@@ -12,7 +13,7 @@ import (
 // CreateCommentRequest 创建评论请求
 type CreateCommentRequest struct {
 	IntervieweeID string `json:"intervieweeId" binding:"required"`
-	Content      string `json:"content" binding:"required"`
+	Content      string `json:"content" binding:"required,max=500"`
 }
 
 // CreateComment 创建评论（面试官）
@@ -129,10 +130,10 @@ func GetComments(db *gorm.DB) gin.HandlerFunc {
 
 			items = append(items, gin.H{
 				"id":             comment.UUID.String(),
-				"content":        comment.Content,
+				"content":        template.HTMLEscapeString(comment.Content),
 				"intervieweeId":   comment.IntervieweeID.String(),
 				"interviewerId":  comment.InterviewerID.String(),
-				"interviewerName": interviewerName,
+				"interviewerName": template.HTMLEscapeString(interviewerName),
 				"createdAt":      comment.CreatedAt,
 			})
 		}

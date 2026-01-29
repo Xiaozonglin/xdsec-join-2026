@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"html/template"
 	"net/http"
 	"xdsec-join-2026/auth"
 	"xdsec-join-2026/models"
@@ -147,11 +148,16 @@ func GetUsers(db *gorm.DB) gin.HandlerFunc {
 		// 构建响应
 		items := make([]gin.H, 0, len(users))
 		for _, user := range users {
+			nickname := ""
+			if user.Nickname != nil {
+				nickname = *user.Nickname
+			}
+
 			userData := gin.H{
 				"id":        user.UUID.String(),
-				"nickname":  user.Nickname,
+				"nickname":  template.HTMLEscapeString(nickname),
 				"email":     user.Email,
-				"signature": user.Signature,
+				"signature": template.HTMLEscapeString(user.Signature),
 				"role":      user.Role,
 				"status":    user.Status,
 			}

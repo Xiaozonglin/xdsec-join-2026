@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"html/template"
 	"net/http"
 	"xdsec-join-2026/models"
 
@@ -11,8 +12,8 @@ import (
 
 // CreateAnnouncementRequest 创建公告请求
 type CreateAnnouncementRequest struct {
-	Title   string `json:"title" binding:"required"`
-	Content string `json:"content" binding:"required"`
+	Title   string `json:"title" binding:"required,max=20"`
+	Content string `json:"content" binding:"required,max=10000"`
 }
 
 // CreateAnnouncement 创建公告（面试官）
@@ -52,8 +53,8 @@ func CreateAnnouncement(db *gorm.DB) gin.HandlerFunc {
 
 // UpdateAnnouncementRequest 更新公告请求
 type UpdateAnnouncementRequest struct {
-	Title   string `json:"title" binding:"required"`
-	Content string `json:"content" binding:"required"`
+	Title   string `json:"title" binding:"required,max=20"`
+	Content string `json:"content" binding:"required,max=10000"`
 }
 
 // UpdateAnnouncement 更新公告（面试官）
@@ -180,10 +181,10 @@ func GetAnnouncements(db *gorm.DB) gin.HandlerFunc {
 
 			items = append(items, gin.H{
 				"id":             a.UUID.String(),
-				"title":          a.Title,
-				"content":        a.Content,
+				"title":          template.HTMLEscapeString(a.Title),
+				"content":        template.HTMLEscapeString(a.Content),
 				"pinned":         a.Pinned,
-				"authorNickname": authorNickname,
+				"authorNickname": template.HTMLEscapeString(authorNickname),
 				"createdAt":      a.CreatedAt,
 				"updatedAt":      a.UpdatedAt,
 			})

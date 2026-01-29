@@ -143,7 +143,7 @@ func main() {
 	commentsRoute := api.Group("/comments")
 	{
 		commentsRoute.POST("", handlers.AuthMiddleware(), handlers.RequireInterviewer(), handlers.CreateComment(db))
-		commentsRoute.GET("/:intervieweeId", handlers.AuthMiddleware(), handlers.GetComments(db))
+		commentsRoute.GET("/:intervieweeId", handlers.AuthMiddleware(), handlers.RequireInterviewer(), handlers.GetComments(db))
 	}
 
 	// 数据导出
