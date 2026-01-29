@@ -38,13 +38,15 @@ type Application struct {
 }
 
 type Announcement struct {
-	UUID      uuid.UUID `gorm:"type:char(36);primarykey" json:"id"`
-	Title     string    `json:"title"`
-	Content   string    `json:"content"`
-	Pinned    bool      `gorm:"column:pinned;default:false" json:"pinned"`
-	AuthorId  uuid.UUID `gorm:"column:author_id" json:"authorId"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	UUID            uuid.UUID `gorm:"type:char(36);primarykey" json:"id"`
+	Title           string    `json:"title"`
+	Content         string    `json:"content"`
+	Pinned          bool      `gorm:"column:pinned;default:false" json:"pinned"`
+	AuthorId        uuid.UUID `gorm:"column:author_id" json:"authorId"`
+	Visibility      string    `gorm:"type:enum('public','all','interviewer','status');default:'public'" json:"visibility"`
+	AllowedStatuses string    `gorm:"type:json" json:"allowedStatuses"`
+	CreatedAt       time.Time `json:"createdAt"`
+	UpdatedAt       time.Time `json:"updatedAt"`
 }
 
 type Task struct {
@@ -76,9 +78,9 @@ type EmailRateLimit struct {
 }
 
 type Comment struct {
-	UUID      uuid.UUID `gorm:"type:char(36);primarykey" json:"id"`
-	Content   string    `gorm:"column:content;type:text;not null" json:"content"`
+	UUID          uuid.UUID `gorm:"type:char(36);primarykey" json:"id"`
+	Content       string    `gorm:"column:content;type:text;not null" json:"content"`
 	IntervieweeID uuid.UUID `gorm:"column:interviewee_id;type:char(36);index;not null" json:"intervieweeId"`
 	InterviewerID uuid.UUID `gorm:"column:interviewer_id;type:char(36);not null" json:"interviewerId"`
-	CreatedAt time.Time `json:"createdAt"`
+	CreatedAt     time.Time `json:"createdAt"`
 }

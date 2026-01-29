@@ -14,11 +14,11 @@ import (
 
 // CommentData 评论数据结构
 type CommentData struct {
-	ID            string `json:"id"`
-	Content       string `json:"content"`
-	InterviewerId string `json:"interviewerId"`
+	ID              string `json:"id"`
+	Content         string `json:"content"`
+	InterviewerId   string `json:"interviewerId"`
 	InterviewerName string `json:"interviewerName"`
-	CreatedAt     string `json:"createdAt"`
+	CreatedAt       string `json:"createdAt"`
 }
 
 // GetUsers 获取用户列表
@@ -103,11 +103,11 @@ func GetUsers(db *gorm.DB) gin.HandlerFunc {
 							interviewerName = comment.InterviewerID.String()
 						}
 						commentData := CommentData{
-							ID:             comment.UUID.String(),
-							Content:        comment.Content,
-							InterviewerId:  comment.InterviewerID.String(),
+							ID:              comment.UUID.String(),
+							Content:         comment.Content,
+							InterviewerId:   comment.InterviewerID.String(),
 							InterviewerName: interviewerName,
-							CreatedAt:     comment.CreatedAt.Format("2006-01-02 15:04:05"),
+							CreatedAt:       comment.CreatedAt.Format("2006-01-02 15:04:05"),
 						}
 						userCommentsMap[comment.IntervieweeID] = append(userCommentsMap[comment.IntervieweeID], commentData)
 					}
@@ -301,10 +301,12 @@ func GetUserDetail(db *gorm.DB) gin.HandlerFunc {
 
 // UpdateProfileRequest 更新个人资料请求
 type UpdateProfileRequest struct {
-	Email     string `json:"email" binding:"required,email"`
-	Nickname  string `json:"nickname" binding:"required"`
-	Signature string `json:"signature" binding:"required"`
-	Directions []string `json:"directions"`
+	Email           string   `json:"email" binding:"required,email"`
+	Nickname        string   `json:"nickname" binding:"required"`
+	Signature       string   `json:"signature" binding:"required"`
+	Directions      []string `json:"directions"`
+	CurrentPassword string   `json:"currentPassword"`
+	EmailCode       string   `json:"emailCode"`
 }
 
 // UpdateProfile 更新个人资料
@@ -336,8 +338,23 @@ func UpdateProfile(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		// 检查邮箱是否被其他用户使用
-		if user.Email != req.Email {
+		// 如果邮箱发生变化，需要验证密码与新邮箱验证码
+		emailChanged := user.Email != req.Email
+		if emailChanged {
+			if req.CurrentPassword == "" {
+				c.JSON(http.StatusBadRequest, gin.H{"ok": false, "message": "请输入当前密码"})
+				return
+			}
+			if err := auth.CheckPassword(req.CurrentPassword, user.PassWord); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"ok": false, "message": "密码错误"})
+				return
+			}
+			if req.EmailCode == "" || !MarkEmailCodeUsed(db, req.Email, req.EmailCode, "profile") {
+				c.JSON(http.StatusBadRequest, gin.H{"ok": false, "message": "验证码无效或已过期"})
+				return
+			}
+
+			// 检查邮箱是否被其他用户使用
 			var existingUser models.User
 			if err := db.Where("email = ? AND uuid != ?", req.Email, userUUID).First(&existingUser).Error; err == nil {
 				c.JSON(http.StatusConflict, gin.H{"ok": false, "message": "邮箱已被使用"})
