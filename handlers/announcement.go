@@ -189,13 +189,14 @@ func GetAnnouncements(db *gorm.DB) gin.HandlerFunc {
 			}
 		}
 
-		if role == "interviewer" {
+		switch role {
+		case "interviewer":
 			// 面试官可见全部
-		} else if role == "interviewee" {
+		case "interviewee":
 			statusJSON := fmt.Sprintf("\"%s\"", status)
 			query = query.Where("(visibility IN ? OR visibility = '' OR visibility IS NULL) OR (visibility = 'status' AND JSON_CONTAINS(allowed_statuses, ?))",
 				[]string{"public", "all"}, statusJSON)
-		} else {
+		default:
 			query = query.Where("visibility = ? OR visibility = '' OR visibility IS NULL", "public")
 		}
 

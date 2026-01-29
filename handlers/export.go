@@ -85,14 +85,9 @@ func ExportApplications(db *gorm.DB) gin.HandlerFunc {
 				row.AddCell().Value = app.Resume
 			} else {
 				// 无申请信息时填充空值
-				row.AddCell().Value = ""
-				row.AddCell().Value = ""
-				row.AddCell().Value = ""
-				row.AddCell().Value = ""
-				row.AddCell().Value = ""
-				row.AddCell().Value = ""
-				row.AddCell().Value = ""
-				row.AddCell().Value = ""
+				for i := 0; i < 8; i++ {
+					row.AddCell().Value = ""
+				}
 			}
 
 			// 解析通过方向
