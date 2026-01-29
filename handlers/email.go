@@ -315,6 +315,7 @@ func Logout() gin.HandlerFunc {
 type ChangePasswordRequest struct {
 	OldPassword string `json:"oldPassword" binding:"required"`
 	NewPassword string `json:"newPassword" binding:"required"`
+	EmailCode   string `json:"emailCode" binding:"required"`
 }
 
 // ChangePassword 修改密码
@@ -336,6 +337,12 @@ func ChangePassword(db *gorm.DB) gin.HandlerFunc {
 		var user models.User
 		if err := db.Where("uuid = ?", userUUID).First(&user).Error; err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"ok": false, "message": "用户不存在"})
+			return
+		}
+
+		// 验证邮箱验证码
+		if !MarkEmailCodeUsed(db, user.Email, req.EmailCode, "profile") {
+			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "message": "验证码无效或已过期"})
 			return
 		}
 

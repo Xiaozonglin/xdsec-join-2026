@@ -304,7 +304,7 @@ type UpdateProfileRequest struct {
 	Email     string `json:"email" binding:"required,email"`
 	Nickname  string `json:"nickname" binding:"required"`
 	Signature string `json:"signature" binding:"required"`
-	EmailCode string `json:"emailCode" binding:"required"`
+	Directions []string `json:"directions"`
 }
 
 // UpdateProfile 更新个人资料
@@ -326,12 +326,6 @@ func UpdateProfile(db *gorm.DB) gin.HandlerFunc {
 		// 验证昵称
 		if !auth.ValidateNickname(req.Nickname) {
 			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "message": "昵称格式不正确"})
-			return
-		}
-
-		// 验证邮箱验证码
-		if !ValidateEmailCode(db, req.Email, req.EmailCode, "profile") {
-			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "message": "验证码无效或已过期"})
 			return
 		}
 
@@ -365,6 +359,15 @@ func UpdateProfile(db *gorm.DB) gin.HandlerFunc {
 			"email":     req.Email,
 			"nickname":  &req.Nickname,
 			"signature": req.Signature,
+		}
+
+		if req.Directions != nil && user.Role == "interviewer" {
+			if !auth.ValidateDirections(req.Directions) {
+				c.JSON(http.StatusBadRequest, gin.H{"ok": false, "message": "方向格式不正确"})
+				return
+			}
+			directionsJSON, _ := json.Marshal(req.Directions)
+			updates["directions"] = string(directionsJSON)
 		}
 
 		if err := db.Model(&user).Updates(updates).Error; err != nil {
@@ -562,6 +565,14 @@ func DeleteUser(db *gorm.DB) gin.HandlerFunc {
 // DeleteSelf 删除自己的账户
 func DeleteSelf(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		var req struct {
+			EmailCode string `json:"emailCode" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "message": "参数校验失败"})
+			return
+		}
+
 		// 获取当前用户
 		userUUID, ok := GetCurrentUserUUID(c)
 		if !ok {
@@ -573,6 +584,12 @@ func DeleteSelf(db *gorm.DB) gin.HandlerFunc {
 		var user models.User
 		if err := db.Where("uuid = ?", userUUID).First(&user).Error; err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"ok": false, "message": "用户不存在"})
+			return
+		}
+
+		// 验证邮箱验证码
+		if !MarkEmailCodeUsed(db, user.Email, req.EmailCode, "profile") {
+			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "message": "验证码无效或已过期"})
 			return
 		}
 
