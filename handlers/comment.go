@@ -135,6 +135,7 @@ func GetComments(db *gorm.DB) gin.HandlerFunc {
 				"interviewerId":   comment.InterviewerID.String(),
 				"interviewerName": template.HTMLEscapeString(interviewerName),
 				"createdAt":       comment.CreatedAt,
+				"updatedAt":       comment.UpdatedAt,
 			})
 		}
 

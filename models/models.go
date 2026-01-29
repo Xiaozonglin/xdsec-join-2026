@@ -83,4 +83,5 @@ type Comment struct {
 	IntervieweeID uuid.UUID `gorm:"column:interviewee_id;type:char(36);index;not null" json:"intervieweeId"`
 	InterviewerID uuid.UUID `gorm:"column:interviewer_id;type:char(36);not null" json:"interviewerId"`
 	CreatedAt     time.Time `json:"createdAt"`
+	UpdatedAt     time.Time `json:"updatedAt"`
 }
