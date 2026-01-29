@@ -29,7 +29,7 @@ func main() {
 	}
 
 	// 自动迁移
-	db.AutoMigrate(&models.User{}, &models.Application{}, &models.Announcement{}, &models.Task{}, &models.EmailCode{}, &models.EmailRateLimit{})
+	db.AutoMigrate(&models.User{}, &models.Application{}, &models.Announcement{}, &models.Task{}, &models.EmailCode{}, &models.EmailRateLimit{}, &models.Comment{})
 
 	// 频率限制中间件（每分钟60次请求）
 	rateLimiter := middleware.NewIPRateLimiter(1, 60)
@@ -137,6 +137,13 @@ func main() {
 		tasksRoute.PATCH("/:id", handlers.AuthMiddleware(), handlers.RequireInterviewer(), handlers.UpdateTask(db))
 		tasksRoute.POST("/:id/report", handlers.AuthMiddleware(), handlers.SubmitTaskReport(db))
 		tasksRoute.DELETE("/:id", handlers.AuthMiddleware(), handlers.RequireInterviewer(), handlers.DeleteTask(db))
+	}
+
+	// 评论
+	commentsRoute := api.Group("/comments")
+	{
+		commentsRoute.POST("", handlers.AuthMiddleware(), handlers.RequireInterviewer(), handlers.CreateComment(db))
+		commentsRoute.GET("/:intervieweeId", handlers.AuthMiddleware(), handlers.GetComments(db))
 	}
 
 	// 数据导出

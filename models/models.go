@@ -74,3 +74,11 @@ type EmailRateLimit struct {
 	LastSent  time.Time `gorm:"column:last_sent;not null"`
 	CreatedAt time.Time
 }
+
+type Comment struct {
+	UUID      uuid.UUID `gorm:"type:char(36);primarykey" json:"id"`
+	Content   string    `gorm:"column:content;type:text;not null" json:"content"`
+	IntervieweeID uuid.UUID `gorm:"column:interviewee_id;type:char(36);index;not null" json:"intervieweeId"`
+	InterviewerID uuid.UUID `gorm:"column:interviewer_id;type:char(36);not null" json:"interviewerId"`
+	CreatedAt time.Time `json:"createdAt"`
+}

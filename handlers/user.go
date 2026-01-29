@@ -11,6 +11,15 @@ import (
 	"gorm.io/gorm"
 )
 
+// CommentData 评论数据结构
+type CommentData struct {
+	ID            string `json:"id"`
+	Content       string `json:"content"`
+	InterviewerId string `json:"interviewerId"`
+	InterviewerName string `json:"interviewerName"`
+	CreatedAt     string `json:"createdAt"`
+}
+
 // GetUsers 获取用户列表
 func GetUsers(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -44,6 +53,95 @@ func GetUsers(db *gorm.DB) gin.HandlerFunc {
 		if err := tx.Find(&users).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "message": "服务器错误"})
 			return
+		}
+
+		// 面试官视角：预加载评论
+		userCommentsMap := make(map[uuid.UUID][]CommentData)
+		if currentRole == "interviewer" {
+			// 收集所有面试者ID
+			intervieweeIds := make([]uuid.UUID, 0)
+			for _, user := range users {
+				if user.Role == "interviewee" {
+					intervieweeIds = append(intervieweeIds, user.UUID)
+				}
+			}
+
+			// 批量查询评论
+			if len(intervieweeIds) > 0 {
+				var comments []models.Comment
+				if err := db.Where("interviewee_id IN ?", intervieweeIds).Find(&comments).Error; err == nil {
+					// 收集面试官ID
+					interviewerIds := make([]uuid.UUID, 0)
+					interviewerSet := make(map[uuid.UUID]struct{})
+					for _, comment := range comments {
+						if _, exists := interviewerSet[comment.InterviewerID]; !exists {
+							interviewerSet[comment.InterviewerID] = struct{}{}
+							interviewerIds = append(interviewerIds, comment.InterviewerID)
+						}
+					}
+
+					// 批量查询面试官昵称
+					interviewerNames := make(map[string]string)
+					if len(interviewerIds) > 0 {
+						var interviewers []models.User
+						if err := db.Select("uuid", "nickname", "email").Where("uuid IN ?", interviewerIds).Find(&interviewers).Error; err == nil {
+							for _, interviewer := range interviewers {
+								name := interviewer.Email
+								if interviewer.Nickname != nil && *interviewer.Nickname != "" {
+									name = *interviewer.Nickname
+								}
+								interviewerNames[interviewer.UUID.String()] = name
+							}
+						}
+					}
+
+					// 按面试者分组评论
+					for _, comment := range comments {
+						interviewerName := interviewerNames[comment.InterviewerID.String()]
+						if interviewerName == "" {
+							interviewerName = comment.InterviewerID.String()
+						}
+						commentData := CommentData{
+							ID:             comment.UUID.String(),
+							Content:        comment.Content,
+							InterviewerId:  comment.InterviewerID.String(),
+							InterviewerName: interviewerName,
+							CreatedAt:     comment.CreatedAt.Format("2006-01-02 15:04:05"),
+						}
+						userCommentsMap[comment.IntervieweeID] = append(userCommentsMap[comment.IntervieweeID], commentData)
+					}
+				}
+			}
+		}
+
+		// 面试官视角：预加载任务
+		userTasksMap := make(map[uuid.UUID]interface{})
+		if currentRole == "interviewer" {
+			// 收集所有面试者ID
+			intervieweeIds := make([]uuid.UUID, 0)
+			for _, user := range users {
+				if user.Role == "interviewee" {
+					intervieweeIds = append(intervieweeIds, user.UUID)
+				}
+			}
+
+			// 批量查询任务
+			if len(intervieweeIds) > 0 {
+				var tasks []models.Task
+				if err := db.Where("target_user_id IN ?", intervieweeIds).Find(&tasks).Error; err == nil {
+					// 按面试者分组任务
+					for _, task := range tasks {
+						userTasksMap[task.TargetUserId] = gin.H{
+							"id":          task.UUID.String(),
+							"title":       task.Title,
+							"description": task.Description,
+							"report":      task.Report,
+							"createdAt":   task.CreatedAt.Format("2006-01-02 15:04:05"),
+							"updatedAt":   task.UpdatedAt.Format("2006-01-02 15:04:05"),
+						}
+					}
+				}
+			}
 		}
 
 		// 构建响应
@@ -84,6 +182,18 @@ func GetUsers(db *gorm.DB) gin.HandlerFunc {
 				userData["email"] = user.Email
 				if user.Application != nil {
 					userData["application"] = user.Application
+				}
+
+				// 添加任务
+				if task, exists := userTasksMap[user.UUID]; exists {
+					userData["task"] = task
+				}
+
+				// 添加评论
+				if comments, exists := userCommentsMap[user.UUID]; exists {
+					userData["comments"] = comments
+				} else {
+					userData["comments"] = []CommentData{}
 				}
 			}
 
